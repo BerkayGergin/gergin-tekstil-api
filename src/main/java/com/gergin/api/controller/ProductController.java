@@ -53,7 +53,7 @@ public class ProductController {
         return ResponseEntity.ok().build();
     }
 
-    // 5. Güvenli Satın Alma ve Sipariş Oluşturma İşlemi
+    // 5. Güvenli Satın Alma ve Sipariş Oluşturma İşlemi (Düzeltilmiş Hali)
     @PostMapping("/purchase")
     public ResponseEntity<String> checkout(@RequestBody Map<String, Object> request) {
         try {
@@ -83,15 +83,18 @@ public class ProductController {
                 Product product = productRepository.findById(id).orElse(null);
 
                 if (product != null) {
-                    // Stok Düşürme (Zırhlı Mantık)
-                    if (product.getStock() != null && product.getStock() > 0) {
-                        product.setStock(product.getStock() - 1);
-                    } else if (product.getStockQuantity() != null && product.getStockQuantity() > 0) {
-                        product.setStockQuantity(product.getStockQuantity() - 1);
+                    // Güncellenmiş Product sınıfına göre güvenli stok kontrolü ve düşüşü
+                    int currentStock = product.getStock();
+                    if (currentStock > 0) {
+                        int newStock = currentStock - 1;
+                        product.setStock(newStock);
+                        product.setStockQuantity(newStock); // İki alanı da senkronize tut
+                        productRepository.save(product);
+                    } else {
+                        return ResponseEntity.badRequest().body("Ürün tükendi: " + product.getName());
                     }
-                    productRepository.save(product);
 
-                    // Fiyatı Güvenli Alış (BigDecimal -> Double Dönüşümü)
+                    // Fiyatı Güvenli Alış
                     double priceVal = 0.0;
                     if (product.getPrice() != null) {
                         priceVal = product.getPrice().doubleValue();
@@ -99,6 +102,7 @@ public class ProductController {
 
                     // Sipariş Kalemi (Item) Ekle
                     OrderItem orderItem = new OrderItem();
+                    orderItem.setProductId(product.getId()); // ID bağlandı
                     orderItem.setProductName(product.getName());
                     orderItem.setPrice(priceVal);
                     orderItem.setOrder(order);
